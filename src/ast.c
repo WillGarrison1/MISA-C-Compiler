@@ -40,9 +40,14 @@ void ast_list_free(AstList *list) {
 void ast_free(AstNode *n) {
 	if (!n) return;
 	switch (n->kind) {
-	case AST_TRANSLATION_UNIT:
+	case AST_TRANSLATION_UNIT: {
 		ast_list_free(n->u.unit.decls);
+		int i;
+		for (i = 0; i < n->u.unit.asm_include_count; i++)
+			free(n->u.unit.asm_includes[i]);
+		free(n->u.unit.asm_includes);
 		break;
+	}
 	case AST_FUNC_DEF:
 	case AST_FUNC_DECL:
 		free(n->u.func.name);

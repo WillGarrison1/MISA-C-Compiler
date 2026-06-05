@@ -359,7 +359,7 @@ static void analyze_decl(Sema *s, AstNode *n, int is_global) {
 			if (!sym) {
 				sym = symtab_define(s->symtab, n->u.func.name, SYM_FUNC, n->u.func.func_type);
 				const char *fn = n->u.func.name;
-				if (fn[0] == '_') {
+				if (n->u.func.is_extern || fn[0] == '_') {
 					sym->func_label = strdup(fn);
 				} else {
 					sym->func_label = (char *)malloc(strlen(fn) + 2);
@@ -398,7 +398,7 @@ static void analyze_func(Sema *s, AstNode *n) {
 		if (!sym) {
 			const char *fn = n->u.func.name;
 			sym = symtab_define(s->symtab, fn, SYM_FUNC, n->u.func.func_type);
-			if (fn[0] == '_') {
+			if (n->u.func.is_extern || fn[0] == '_') {
 				sym->func_label = strdup(fn);
 			} else {
 				sym->func_label = (char *)malloc(strlen(fn) + 2);
@@ -480,10 +480,10 @@ void sema_init(Sema *s, SymTab *st) {
 	reg_builtin(s, "storage_write", BUILTIN_STORAGE_WRITE, type_make_void(), 3,
 	    type_make_pointer(type_make_void()),
 	    type_make_pointer(type_make_void()), type_make_int(0));
-	reg_builtin(s, "memcpy",   BUILTIN_MEM_COPY,  type_make_void(), 3,
+	reg_builtin(s, "mem_copy",   BUILTIN_MEM_COPY,  type_make_void(), 3,
 	    type_make_pointer(type_make_void()),
 	    type_make_pointer(type_make_void()), type_make_int(0));
-	reg_builtin(s, "memset",    BUILTIN_MEM_SET,   type_make_void(), 3,
+	reg_builtin(s, "mem_set",    BUILTIN_MEM_SET,   type_make_void(), 3,
 	    type_make_pointer(type_make_void()), type_make_int(0), type_make_int(0));
 	reg_builtin(s, "preserve_back_buffer",  BUILTIN_PRESERVE_BACK_BUFFER,  type_make_void(), 0);
 	reg_builtin(s, "preserve_front_buffer", BUILTIN_PRESERVE_FRONT_BUFFER, type_make_void(), 0);

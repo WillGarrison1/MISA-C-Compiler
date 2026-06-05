@@ -1391,7 +1391,7 @@ void codegen_emit(CodeGen *cg, AstNode *unit) {
 				}
 				if (!sym->func_label) {
 					const char *fn = n->u.func.name;
-					if (fn[0] == '_') {
+					if (n->u.func.is_extern || fn[0] == '_') {
 						sym->func_label = strdup(fn);
 					} else {
 						char *lbl = (char *)malloc(strlen(fn) + 2);
@@ -1452,5 +1452,21 @@ void codegen_emit(CodeGen *cg, AstNode *unit) {
 			p++;
 		}
 		fprintf(cg->out, "\"\n");
+	}
+
+	for (i = 0; i < unit->u.unit.asm_include_count; i++) {
+		const char *path = unit->u.unit.asm_includes[i];
+		FILE *af = fopen(path, "r");
+		if (!af) {
+			fprintf(stderr, "codegen: cannot open asm include '%s'\n", path);
+			cg->had_error = 1;
+			continue;
+		}
+		fprintf(cg->out, "\n");
+		char buf[4096];
+		size_t n2;
+		while ((n2 = fread(buf, 1, sizeof(buf), af)) > 0)
+			fwrite(buf, 1, n2, cg->out);
+		fclose(af);
 	}
 }

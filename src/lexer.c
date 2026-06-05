@@ -262,6 +262,129 @@ static void handle_directive(Lexer *l) {
 		l->macros[l->macro_count].name = strdup(mname);
 		l->macros[l->macro_count].body = strdup(body);
 		l->macro_count++;
+	} else if (!strcmp(name, "include")) {
+		
+		while (l->pos < l->len && l->src[l->pos] == ' ') l->pos++;
+		char delim_open = l->src[l->pos];
+		char delim_close = (delim_open == '"') ? '"' : '>';
+		if (l->pos < l->len && (delim_open == '"' || delim_open == '<')) {
+			l->pos++;
+			char path[512]; int pi = 0;
+			while (l->pos < l->len && l->src[l->pos] != delim_close
+			    && l->src[l->pos] != '\n' && pi < 511)
+				path[pi++] = l->src[l->pos++];
+			path[pi] = '\0';
+			if (l->pos < l->len && l->src[l->pos] == delim_close) l->pos++;
+			
+			int plen = pi;
+			if (plen >= 4 && !strcmp(path + plen - 4, ".asm")) {
+				
+				char resolved[512];
+				FILE *probe = fopen(path, "r");
+				if (!probe && l->filename) {
+					
+					const char *last_sep = NULL;
+					const char *p2 = l->filename;
+					while (*p2) {
+						if (*p2 == '/' || *p2 == '\\') last_sep = p2;
+						p2++;
+					}
+					if (last_sep) {
+						int dir_len = (int)(last_sep - l->filename) + 1;
+						if (dir_len + pi < 511) {
+							memcpy(resolved, l->filename, dir_len);
+							memcpy(resolved + dir_len, path, pi + 1);
+							probe = fopen(resolved, "r");
+							if (probe) { fclose(probe); strcpy(path, resolved); }
+						}
+					}
+				} else {
+					fclose(probe);
+				}
+				
+				if (l->asm_include_count >= l->asm_include_cap) {
+					l->asm_include_cap = l->asm_include_cap ? l->asm_include_cap * 2 : 4;
+					l->asm_includes = (char **)realloc(l->asm_includes,
+					    l->asm_include_cap * sizeof(char *));
+				}
+				l->asm_includes[l->asm_include_count++] = strdup(path);
+			} else {
+				
+				char resolved[512];
+				strncpy(resolved, path, 511); resolved[511] = '\0';
+				FILE *probe = fopen(resolved, "r");
+				if (!probe && l->filename) {
+					const char *last_sep = NULL;
+					const char *p2 = l->filename;
+					while (*p2) {
+						if (*p2 == '/' || *p2 == '\\') last_sep = p2;
+						p2++;
+					}
+					if (last_sep) {
+						int dir_len = (int)(last_sep - l->filename) + 1;
+						if (dir_len + pi < 511) {
+							memcpy(resolved, l->filename, dir_len);
+							memcpy(resolved + dir_len, path, pi + 1);
+							probe = fopen(resolved, "r");
+						}
+					}
+				}
+				if (!probe) {
+					fprintf(stderr, "%s:%d: warning: cannot open include '%s'\n",
+					    l->filename, l->line, path);
+				} else {
+					fclose(probe);
+					
+					int already = 0;
+					int si;
+					for (si = 0; si < l->seen_count; si++) {
+						if (!strcmp(l->seen_includes[si], resolved)) { already = 1; break; }
+					}
+					if (!already) {
+						if (l->seen_count >= l->seen_cap) {
+							l->seen_cap = l->seen_cap ? l->seen_cap * 2 : 8;
+							l->seen_includes = (char **)realloc(l->seen_includes,
+							    l->seen_cap * sizeof(char *));
+						}
+						l->seen_includes[l->seen_count++] = strdup(resolved);
+						
+						FILE *f2 = fopen(resolved, "rb");
+						fseek(f2, 0, SEEK_END);
+						long fsz = ftell(f2);
+						rewind(f2);
+						char *fbuf = (char *)malloc(fsz + 1);
+						fread(fbuf, 1, fsz, f2);
+						fbuf[fsz] = '\0';
+						fclose(f2);
+						
+						if (l->include_depth >= l->include_cap) {
+							l->include_cap = l->include_cap ? l->include_cap * 2 : 8;
+							l->include_stack = (IncludeFrame *)realloc(l->include_stack,
+							    l->include_cap * sizeof(IncludeFrame));
+						}
+						IncludeFrame *fr = &l->include_stack[l->include_depth++];
+						fr->src            = l->src;
+						fr->owned_buf      = l->owned_buf;
+						fr->pos            = l->pos;
+						fr->len            = l->len;
+						fr->line           = l->line;
+						fr->col            = l->col;
+						fr->filename       = l->filename;
+						fr->filename_owned = l->filename_owned;
+						
+						l->src            = fbuf;
+						l->owned_buf      = fbuf;
+						l->pos            = 0;
+						l->len            = (int)fsz;
+						l->line           = 1;
+						l->col            = 1;
+						l->filename       = strdup(resolved);
+						l->filename_owned = 1;
+						return; 
+					}
+				}
+			}
+		}
 	}
 	
 	while (l->pos < l->len && l->src[l->pos] != '\n') l->pos++;
@@ -291,6 +414,18 @@ void lexer_free(Lexer *l) {
 		free(l->macros[i].body);
 	}
 	free(l->macros);
+	for (i = 0; i < l->asm_include_count; i++) free(l->asm_includes[i]);
+	free(l->asm_includes);
+	free(l->owned_buf);
+	if (l->filename_owned) free((char *)l->filename);
+	for (i = 0; i < l->include_depth; i++) {
+		free(l->include_stack[i].owned_buf);
+		if (l->include_stack[i].filename_owned)
+			free((char *)l->include_stack[i].filename);
+	}
+	free(l->include_stack);
+	for (i = 0; i < l->seen_count; i++) free(l->seen_includes[i]);
+	free(l->seen_includes);
 	if (l->has_lookahead) free(l->lookahead.text);
 }
 
@@ -303,8 +438,23 @@ Token lexer_error(Lexer *l, const char *msg) {
 static Token lex_one(Lexer *l) {
 	skip_whitespace_and_comments(l);
 
-	if (l->pos >= l->len)
+	if (l->pos >= l->len) {
+		if (l->include_depth > 0) {
+			free(l->owned_buf);
+			if (l->filename_owned) free((char *)l->filename);
+			IncludeFrame *fr = &l->include_stack[--l->include_depth];
+			l->src            = fr->src;
+			l->owned_buf      = fr->owned_buf;
+			l->pos            = fr->pos;
+			l->len            = fr->len;
+			l->line           = fr->line;
+			l->col            = fr->col;
+			l->filename       = fr->filename;
+			l->filename_owned = fr->filename_owned;
+			return lex_one(l);
+		}
 		return make_token(TOK_EOF, "<eof>", l->line, l->col);
+	}
 
 	int    sl = l->line, sc = l->col;
 	char   c  = l->src[l->pos];
