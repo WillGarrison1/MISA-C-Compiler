@@ -309,7 +309,7 @@ static void handle_directive(Lexer *l) {
 				}
 				l->asm_includes[l->asm_include_count++] = strdup(path);
 			} else {
-				/* C / H include: resolve path, read file, push stack */
+				
 				char resolved[512];
 				strncpy(resolved, path, 511); resolved[511] = '\0';
 				FILE *probe = fopen(resolved, "r");
@@ -334,7 +334,7 @@ static void handle_directive(Lexer *l) {
 					    l->filename, l->line, path);
 				} else {
 					fclose(probe);
-					/* include-once: skip if already seen */
+					
 					int already = 0;
 					int si;
 					for (si = 0; si < l->seen_count; si++) {
@@ -347,7 +347,7 @@ static void handle_directive(Lexer *l) {
 							    l->seen_cap * sizeof(char *));
 						}
 						l->seen_includes[l->seen_count++] = strdup(resolved);
-						/* read file into heap buffer */
+						
 						FILE *f2 = fopen(resolved, "rb");
 						fseek(f2, 0, SEEK_END);
 						long fsz = ftell(f2);
@@ -356,7 +356,7 @@ static void handle_directive(Lexer *l) {
 						fread(fbuf, 1, fsz, f2);
 						fbuf[fsz] = '\0';
 						fclose(f2);
-						/* push current state onto include stack */
+						
 						if (l->include_depth >= l->include_cap) {
 							l->include_cap = l->include_cap ? l->include_cap * 2 : 8;
 							l->include_stack = (IncludeFrame *)realloc(l->include_stack,
@@ -371,7 +371,7 @@ static void handle_directive(Lexer *l) {
 						fr->col            = l->col;
 						fr->filename       = l->filename;
 						fr->filename_owned = l->filename_owned;
-						/* switch to included file */
+						
 						l->src            = fbuf;
 						l->owned_buf      = fbuf;
 						l->pos            = 0;
@@ -380,7 +380,7 @@ static void handle_directive(Lexer *l) {
 						l->col            = 1;
 						l->filename       = strdup(resolved);
 						l->filename_owned = 1;
-						return; /* already positioned at start of included file */
+						return; 
 					}
 				}
 			}
