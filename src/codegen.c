@@ -4,9 +4,40 @@
 #include <stdarg.h>
 #include "codegen.h"
 
+typedef struct {
+	BuiltinId   id;
+	const char *syscall_name;
+	int         tpr_mask; /* bitmask of arg indices that are pa-relative addresses */
+} BuiltinInfo;
 
+static const BuiltinInfo builtin_table[] = {
+	{ BUILTIN_PRINT_INT,             "SYS_PRINT_INT",             0 },
+	{ BUILTIN_PRINT_FLOAT,           "SYS_PRINT_FLOAT",           0 },
+	{ BUILTIN_PRINT_STRING,          "SYS_PRINT_STRING",          1 }, /* a0 */
+	{ BUILTIN_DRAW_RECT,             "SYS_DRAW_RECT",             0 },
+	{ BUILTIN_DRAW_TEXTURE,          "SYS_DRAW_TEXTURE",          1 }, /* a0 */
+	{ BUILTIN_DRAW_TEXTURE_REGION,   "SYS_DRAW_TEXTURE_REGION",   1 }, /* a0 */
+	{ BUILTIN_STORAGE_READ,          "SYS_STORAGE_READ",          1 }, /* a0 */
+	{ BUILTIN_STORAGE_WRITE,         "SYS_STORAGE_WRITE",         2 }, /* a1 */
+	{ BUILTIN_MEM_COPY,              "SYS_MEM_COPY",              3 }, /* a0, a1 */
+	{ BUILTIN_MEM_SET,               "SYS_MEM_SET",               1 }, /* a0 */
+	{ BUILTIN_PRESERVE_BACK_BUFFER,  "SYS_PRESERVE_BACK_BUFFER",  0 },
+	{ BUILTIN_PRESERVE_FRONT_BUFFER, "SYS_PRESERVE_FRONT_BUFFER", 0 },
+	{ BUILTIN_GET_INPUT,             "SYS_GET_INPUT",             0 },
+	{ BUILTIN_GET_UNIX_TIME,         "SYS_GET_UNIX_TIME",         0 },
+	{ BUILTIN_GET_RUNNING_TIME,      "SYS_GET_RUNNING_TIME",      0 },
+	{ BUILTIN_GET_UPDATE_DELTA,      "SYS_GET_UPDATE_DELTA",      0 },
+	{ BUILTIN_GET_DRAW_DELTA,        "SYS_GET_DRAW_DELTA",        0 },
+	{ BUILTIN_SET_RNG_SEED,          "SYS_SET_RNG_SEED",          0 },
+	{ BUILTIN_NONE, NULL, 0 }
+};
 
-
+static const BuiltinInfo *builtin_lookup(BuiltinId id) {
+	int i;
+	for (i = 0; builtin_table[i].id != BUILTIN_NONE; i++)
+		if (builtin_table[i].id == id) return &builtin_table[i];
+	return NULL;
+}
 
 static char *cg_new_label(CodeGen *cg) {
 	char buf[32];
@@ -65,10 +96,6 @@ static void emit_comment(CodeGen *cg, const char *msg) {
 	fprintf(cg->out, "\t# %s\n", msg);
 }
 
-
-
-
-
 static int cg_intern_string(CodeGen *cg, const char *value) {
 	int i;
 	for (i = 0; i < cg->str_count; i++) {
@@ -85,10 +112,6 @@ static int cg_intern_string(CodeGen *cg, const char *value) {
 	cg->str_count++;
 	return id;
 }
-
-
-
-
 
 typedef struct FrameVar {
 	char           *name;
@@ -865,16 +888,27 @@ static int cg_expr(CodeGen *cg, AstNode *n, FrameLayout *fl) {
 		
 		if (n->u.call.callee->kind == AST_IDENT) {
 			Symbol *sym = symtab_lookup(cg->symtab, n->u.call.callee->u.ident.name);
-			if (sym && sym->kind == SYM_FUNC) {
+			if (sym && sym->builtin_id != BUILTIN_NONE) {
+				const BuiltinInfo *bi = builtin_lookup(sym->builtin_id);
+				if (bi) {
+					int j;
+					for (j = 0; j < argc; j++) {
+						if (bi->tpr_mask & (1 << j))
+							emit(cg, "tpr %s", arg_name(j));
+					}
+					emit(cg, "syscall %s", bi->syscall_name);
+				}
+			} else if (sym && sym->kind == SYM_FUNC) {
 				emit(cg, "cal %s", sym->func_label ? sym->func_label : sym->name);
 			} else {
-				
 				int cr = cg_expr(cg, n->u.call.callee, fl);
+				emit(cg, "tpr %s", temp_name(cr));
 				emit(cg, "cal %s", temp_name(cr));
 				cg_free_temp(cg, cr);
 			}
 		} else {
 			int cr = cg_expr(cg, n->u.call.callee, fl);
+			emit(cg, "tpr %s", temp_name(cr));
 			emit(cg, "cal %s", temp_name(cr));
 			cg_free_temp(cg, cr);
 		}
@@ -1215,7 +1249,11 @@ static void cg_func(CodeGen *cg, AstNode *n) {
 	}
 
 	fprintf(cg->out, "\n");
-	emit_label(cg, n->u.func.name);
+	{
+		Symbol *fsym = symtab_lookup(cg->symtab, n->u.func.name);
+		const char *flbl = (fsym && fsym->func_label) ? fsym->func_label : n->u.func.name;
+		emit_label(cg, flbl);
+	}
 	
 	if (fl.total > 0) emit(cg, "sub sp, %d", fl.total);
 	
@@ -1242,16 +1280,20 @@ static void cg_func(CodeGen *cg, AstNode *n) {
 	}
 
 	cg->frame_size = fl.total;
+	AstNode *last_stmt = NULL;
 	if (n->u.func.body) {
 		AstList *bl = n->u.func.body->u.block.items;
 		while (bl) {
 			cg_stmt(cg, bl->node, &fl);
+			last_stmt = bl->node;
 			bl = bl->next;
 		}
 	}
 
-	if (fl.total > 0) emit(cg, "add sp, %d", fl.total);
-	emit(cg, "ret");
+	if (!last_stmt || last_stmt->kind != AST_RETURN) {
+		if (fl.total > 0) emit(cg, "add sp, %d", fl.total);
+		emit(cg, "ret");
+	}
 
 	symtab_pop(cg->symtab);
 	frame_free(&fl);
@@ -1343,8 +1385,11 @@ void codegen_emit(CodeGen *cg, AstNode *unit) {
 					sym = symtab_define(cg->symtab, n->u.func.name, SYM_FUNC,
 					    n->u.func.func_type);
 				}
-				if (!sym->func_label)
-					sym->func_label = strdup(n->u.func.name);
+				if (!sym->func_label) {
+					char *lbl = (char *)malloc(strlen(n->u.func.name) + 2);
+					sprintf(lbl, "%s_", n->u.func.name);
+					sym->func_label = lbl;
+				}
 			}
 		}
 		it = it->next;

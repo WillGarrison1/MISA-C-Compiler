@@ -12,9 +12,7 @@ make
 Or manually:
 
 ```
-clang -Iinclude -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_DEPRECATE \
-  src/token.c src/ast.c src/type.c src/symtab.c \
-  src/lexer.c src/parser.c src/sema.c src/codegen.c src/main.c -o misacc.exe
+clang -Iinclude -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_DEPRECATE src/token.c src/ast.c src/type.c src/symtab.c src/lexer.c src/parser.c src/sema.c src/codegen.c src/main.c -o misacc.exe
 ```
 
 ## Usage

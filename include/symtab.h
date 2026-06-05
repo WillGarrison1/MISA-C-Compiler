@@ -17,6 +17,32 @@ typedef enum {
 } SymKind;
 
 /*
+ * Built-in function IDs (syscall wrappers).
+ * BUILTIN_NONE means the symbol is not a built-in.
+ */
+typedef enum {
+	BUILTIN_NONE = 0,
+	BUILTIN_PRINT_INT,
+	BUILTIN_PRINT_FLOAT,
+	BUILTIN_PRINT_STRING,
+	BUILTIN_DRAW_RECT,
+	BUILTIN_DRAW_TEXTURE,
+	BUILTIN_DRAW_TEXTURE_REGION,
+	BUILTIN_STORAGE_READ,
+	BUILTIN_STORAGE_WRITE,
+	BUILTIN_MEM_COPY,
+	BUILTIN_MEM_SET,
+	BUILTIN_PRESERVE_BACK_BUFFER,
+	BUILTIN_PRESERVE_FRONT_BUFFER,
+	BUILTIN_GET_INPUT,
+	BUILTIN_GET_UNIX_TIME,
+	BUILTIN_GET_RUNNING_TIME,
+	BUILTIN_GET_UPDATE_DELTA,
+	BUILTIN_GET_DRAW_DELTA,
+	BUILTIN_SET_RNG_SEED
+} BuiltinId;
+
+/*
  * A symbol table entry.
  */
 typedef struct Symbol {
@@ -32,6 +58,7 @@ typedef struct Symbol {
 
 	/* SYM_FUNC */
 	char         *func_label;   /* assembly label for the function */
+	BuiltinId     builtin_id;   /* non-zero if this is a syscall wrapper */
 
 	/* SYM_ENUM_CONST */
 	long long     enum_value;

@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
 
 	FILE *out;
 	if (output_path) {
-		out = fopen(output_path, "w");
+		out = fopen(output_path, "wb");
 		if (!out) {
 			fprintf(stderr, "Error: cannot open output file '%s'\n", output_path);
 			ast_free(ast);

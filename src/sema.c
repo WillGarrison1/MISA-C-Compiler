@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include "sema.h"
 
 static void  analyze_decl(Sema *s, AstNode *n, int is_global);
@@ -420,9 +421,67 @@ static void analyze_func(Sema *s, AstNode *n) {
 	s->current_func_ret = saved;
 }
 
+static void reg_builtin(Sema *s, const char *name, BuiltinId bid,
+                        Type *ret, int nparams, ...) {
+	TypeParam *head = NULL, **cur = &head;
+	va_list ap;
+	int i;
+	va_start(ap, nparams);
+	for (i = 0; i < nparams; i++) {
+		TypeParam *p = (TypeParam *)calloc(1, sizeof(TypeParam));
+		p->type = va_arg(ap, Type *);
+		*cur = p;
+		cur = &p->next;
+	}
+	va_end(ap);
+	{
+		Symbol *sym = symtab_define(s->symtab, name, SYM_FUNC,
+		    type_make_function(ret, head, 0));
+		sym->builtin_id = bid;
+	}
+}
+
 void sema_init(Sema *s, SymTab *st) {
 	memset(s, 0, sizeof(*s));
 	s->symtab = st;
+
+	/* Register syscall wrappers as built-in functions. */
+	reg_builtin(s, "printi", BUILTIN_PRINT_INT,    type_make_void(), 1,
+	    type_make_int(0));
+	reg_builtin(s, "printf", BUILTIN_PRINT_FLOAT,  type_make_void(), 2,
+	    type_make_float(), type_make_int(0));
+	reg_builtin(s, "prints", BUILTIN_PRINT_STRING, type_make_void(), 1,
+	    type_make_pointer(type_make_char(0)));
+	reg_builtin(s, "draw_rect",   BUILTIN_DRAW_RECT,   type_make_void(), 5,
+	    type_make_int(0), type_make_int(0), type_make_int(0),
+	    type_make_int(0), type_make_int(0));
+	reg_builtin(s, "draw_texture", BUILTIN_DRAW_TEXTURE, type_make_void(), 4,
+	    type_make_pointer(type_make_void()), type_make_int(0),
+	    type_make_int(0), type_make_int(0));
+	reg_builtin(s, "draw_texture_region", BUILTIN_DRAW_TEXTURE_REGION, type_make_void(), 8,
+	    type_make_pointer(type_make_void()), type_make_int(0), type_make_int(0),
+	    type_make_int(0), type_make_int(0), type_make_int(0),
+	    type_make_int(0), type_make_int(0));
+	reg_builtin(s, "storage_read",  BUILTIN_STORAGE_READ,  type_make_void(), 3,
+	    type_make_pointer(type_make_void()),
+	    type_make_pointer(type_make_void()), type_make_int(0));
+	reg_builtin(s, "storage_write", BUILTIN_STORAGE_WRITE, type_make_void(), 3,
+	    type_make_pointer(type_make_void()),
+	    type_make_pointer(type_make_void()), type_make_int(0));
+	reg_builtin(s, "mem_copy",   BUILTIN_MEM_COPY,  type_make_void(), 3,
+	    type_make_pointer(type_make_void()),
+	    type_make_pointer(type_make_void()), type_make_int(0));
+	reg_builtin(s, "mem_set",    BUILTIN_MEM_SET,   type_make_void(), 3,
+	    type_make_pointer(type_make_void()), type_make_int(0), type_make_int(0));
+	reg_builtin(s, "preserve_back_buffer",  BUILTIN_PRESERVE_BACK_BUFFER,  type_make_void(), 0);
+	reg_builtin(s, "preserve_front_buffer", BUILTIN_PRESERVE_FRONT_BUFFER, type_make_void(), 0);
+	reg_builtin(s, "get_input",        BUILTIN_GET_INPUT,        type_make_int(0),  0);
+	reg_builtin(s, "get_unix_time",    BUILTIN_GET_UNIX_TIME,    type_make_int(0),  0);
+	reg_builtin(s, "get_running_time", BUILTIN_GET_RUNNING_TIME, type_make_float(), 0);
+	reg_builtin(s, "get_update_delta", BUILTIN_GET_UPDATE_DELTA, type_make_float(), 0);
+	reg_builtin(s, "get_draw_delta",   BUILTIN_GET_DRAW_DELTA,   type_make_float(), 0);
+	reg_builtin(s, "set_rng_seed",     BUILTIN_SET_RNG_SEED,     type_make_void(),  1,
+	    type_make_int(0));
 }
 
 void sema_analyze(Sema *s, AstNode *unit) {
