@@ -445,7 +445,7 @@ void sema_init(Sema *s, SymTab *st) {
 	memset(s, 0, sizeof(*s));
 	s->symtab = st;
 
-	/* Register syscall wrappers as built-in functions. */
+	
 	reg_builtin(s, "printi", BUILTIN_PRINT_INT,    type_make_void(), 1,
 	    type_make_int(0));
 	reg_builtin(s, "printf", BUILTIN_PRINT_FLOAT,  type_make_void(), 2,

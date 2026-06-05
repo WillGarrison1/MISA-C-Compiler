@@ -7,20 +7,20 @@
 typedef struct {
 	BuiltinId   id;
 	const char *syscall_name;
-	int         tpr_mask; /* bitmask of arg indices that are pa-relative addresses */
+	int         tpr_mask; 
 } BuiltinInfo;
 
 static const BuiltinInfo builtin_table[] = {
 	{ BUILTIN_PRINT_INT,             "SYS_PRINT_INT",             0 },
 	{ BUILTIN_PRINT_FLOAT,           "SYS_PRINT_FLOAT",           0 },
-	{ BUILTIN_PRINT_STRING,          "SYS_PRINT_STRING",          1 }, /* a0 */
+	{ BUILTIN_PRINT_STRING,          "SYS_PRINT_STRING",          1 }, 
 	{ BUILTIN_DRAW_RECT,             "SYS_DRAW_RECT",             0 },
-	{ BUILTIN_DRAW_TEXTURE,          "SYS_DRAW_TEXTURE",          1 }, /* a0 */
-	{ BUILTIN_DRAW_TEXTURE_REGION,   "SYS_DRAW_TEXTURE_REGION",   1 }, /* a0 */
-	{ BUILTIN_STORAGE_READ,          "SYS_STORAGE_READ",          1 }, /* a0 */
-	{ BUILTIN_STORAGE_WRITE,         "SYS_STORAGE_WRITE",         2 }, /* a1 */
-	{ BUILTIN_MEM_COPY,              "SYS_MEM_COPY",              3 }, /* a0, a1 */
-	{ BUILTIN_MEM_SET,               "SYS_MEM_SET",               1 }, /* a0 */
+	{ BUILTIN_DRAW_TEXTURE,          "SYS_DRAW_TEXTURE",          1 }, 
+	{ BUILTIN_DRAW_TEXTURE_REGION,   "SYS_DRAW_TEXTURE_REGION",   1 }, 
+	{ BUILTIN_STORAGE_READ,          "SYS_STORAGE_READ",          1 }, 
+	{ BUILTIN_STORAGE_WRITE,         "SYS_STORAGE_WRITE",         2 }, 
+	{ BUILTIN_MEM_COPY,              "SYS_MEM_COPY",              3 }, 
+	{ BUILTIN_MEM_SET,               "SYS_MEM_SET",               1 }, 
 	{ BUILTIN_PRESERVE_BACK_BUFFER,  "SYS_PRESERVE_BACK_BUFFER",  0 },
 	{ BUILTIN_PRESERVE_FRONT_BUFFER, "SYS_PRESERVE_FRONT_BUFFER", 0 },
 	{ BUILTIN_GET_INPUT,             "SYS_GET_INPUT",             0 },
