@@ -21,8 +21,8 @@ cmake ..
 make
 ```
 > [!NOTE]
-> If you need any platform besides the default (Makefile), please use `cmake -G "<generator-name>" ..`.
-> The generators available are listed [here](https://cmake.org/cmake/help/latest/manual/cmake-generators.7.html).
+> If you need any platform besides the default (Makefile), please use `cmake -G "<generator-name>" ..`.\
+> The generators available are listed [here](https://cmake.org/cmake/help/latest/manual/cmake-generators.7.html).\
 > Ex: `cmake -G "Visual Studio 17 2022" ..`
 
 Without `CMake`:
