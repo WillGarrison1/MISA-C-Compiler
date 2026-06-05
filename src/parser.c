@@ -604,7 +604,7 @@ static AstNode *parse_decl(Parser *p, int allow_func_def) {
 				tp = tp->next;
 			}
 			Symbol *sym = symtab_define(p->symtab, name, SYM_FUNC, full);
-			if (name[0] == '_') {
+			if (is_extern || name[0] == '_') {
 				sym->func_label = strdup(name);
 			} else {
 				sym->func_label = (char *)malloc(strlen(name) + 2);
@@ -639,7 +639,7 @@ static AstNode *parse_decl(Parser *p, int allow_func_def) {
 			n->u.func.is_static = is_static;
 			n->u.func.is_extern = is_extern;
 			Symbol *sym = symtab_define(p->symtab, name, SYM_FUNC, full);
-			if (name[0] == '_') {
+			if (is_extern || name[0] == '_') {
 				sym->func_label = strdup(name);
 			} else {
 				sym->func_label = (char *)malloc(strlen(name) + 2);
@@ -789,9 +789,7 @@ static AstNode *parse_unary(Parser *p) {
 
 	if (t == TOK_KW_SIZEOF) {
 		advance(p);
-		if (check(p, TOK_LPAREN) && is_type_start(p)) {
-			int saved_pos = p->lexer->pos;
-			(void)saved_pos;
+		if (check(p, TOK_LPAREN)) {
 			advance(p);
 			if (is_type_start(p)) {
 				int dummy2;
@@ -969,9 +967,18 @@ void parser_init(Parser *p, Lexer *l, SymTab *st) {
 AstNode *parser_parse(Parser *p) {
 	AstNode *unit = ast_new(AST_TRANSLATION_UNIT, 1);
 	unit->u.unit.decls = NULL;
+	unit->u.unit.asm_includes = NULL;
+	unit->u.unit.asm_include_count = 0;
 	while (!check(p, TOK_EOF)) {
 		AstNode *decl = parse_decl(p, 1);
 		if (decl) unit->u.unit.decls = ast_list_append(unit->u.unit.decls, decl);
+	}
+	if (p->lexer->asm_include_count > 0) {
+		unit->u.unit.asm_includes = p->lexer->asm_includes;
+		unit->u.unit.asm_include_count = p->lexer->asm_include_count;
+		p->lexer->asm_includes = NULL;
+		p->lexer->asm_include_count = 0;
+		p->lexer->asm_include_cap = 0;
 	}
 	return unit;
 }

@@ -85,7 +85,9 @@ struct AstNode {
 	union {
 		/* AST_TRANSLATION_UNIT */
 		struct {
-			AstList *decls;
+			AstList  *decls;
+			char    **asm_includes;   /* paths of #include'd .asm files */
+			int       asm_include_count;
 		} unit;
 
 		/*

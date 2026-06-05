@@ -4,16 +4,44 @@
 #include "token.h"
 
 /*
+ * Saved state for one level of #include nesting.
+ */
+typedef struct {
+	const char *src;
+	char       *owned_buf;     /* heap buf for this level, or NULL */
+	int         pos;
+	int         len;
+	int         line;
+	int         col;
+	const char *filename;
+	int         filename_owned;
+} IncludeFrame;
+
+/*
  * Lexer / preprocessor state.
  * Handles tokenizing C89 source with basic preprocessing.
  */
 typedef struct {
-	const char *src;        /* source text (not owned) */
+	const char *src;        /* source text */
 	int         pos;        /* current position in src */
 	int         len;        /* length of src */
 	int         line;
 	int         col;
 	const char *filename;
+
+	/* Ownership of the current src buffer (from an #include) */
+	char       *owned_buf;
+	int         filename_owned;
+
+	/* Include file stack */
+	IncludeFrame *include_stack;
+	int           include_depth;
+	int           include_cap;
+
+	/* Already-included file paths (include-once semantics) */
+	char      **seen_includes;
+	int         seen_count;
+	int         seen_cap;
 
 	/* Simple #define macro table (object-like, integer/float only) */
 	struct MacroDef {
@@ -22,6 +50,11 @@ typedef struct {
 	}          *macros;
 	int         macro_count;
 	int         macro_cap;
+
+	/* Collected .asm include paths from #include directives */
+	char      **asm_includes;
+	int         asm_include_count;
+	int         asm_include_cap;
 
 	/* One token of lookahead */
 	Token       lookahead;
