@@ -458,11 +458,11 @@ void sema_init(Sema *s, SymTab *st) {
 	s->symtab = st;
 
 	
-	reg_builtin(s, "printi", BUILTIN_PRINT_INT,    type_make_void(), 1,
+	reg_builtin(s, "print_int", BUILTIN_PRINT_INT,    type_make_void(), 1,
 	    type_make_int(0));
-	reg_builtin(s, "printf", BUILTIN_PRINT_FLOAT,  type_make_void(), 2,
+	reg_builtin(s, "print_float", BUILTIN_PRINT_FLOAT,  type_make_void(), 2,
 	    type_make_float(), type_make_int(0));
-	reg_builtin(s, "prints", BUILTIN_PRINT_STRING, type_make_void(), 1,
+	reg_builtin(s, "print_string", BUILTIN_PRINT_STRING, type_make_void(), 1,
 	    type_make_pointer(type_make_char(0)));
 	reg_builtin(s, "draw_rect",   BUILTIN_DRAW_RECT,   type_make_void(), 5,
 	    type_make_int(0), type_make_int(0), type_make_int(0),
@@ -480,10 +480,10 @@ void sema_init(Sema *s, SymTab *st) {
 	reg_builtin(s, "storage_write", BUILTIN_STORAGE_WRITE, type_make_void(), 3,
 	    type_make_pointer(type_make_void()),
 	    type_make_pointer(type_make_void()), type_make_int(0));
-	reg_builtin(s, "mem_copy",   BUILTIN_MEM_COPY,  type_make_void(), 3,
+	reg_builtin(s, "memcpy",   BUILTIN_MEM_COPY,  type_make_void(), 3,
 	    type_make_pointer(type_make_void()),
 	    type_make_pointer(type_make_void()), type_make_int(0));
-	reg_builtin(s, "mem_set",    BUILTIN_MEM_SET,   type_make_void(), 3,
+	reg_builtin(s, "memset",    BUILTIN_MEM_SET,   type_make_void(), 3,
 	    type_make_pointer(type_make_void()), type_make_int(0), type_make_int(0));
 	reg_builtin(s, "preserve_back_buffer",  BUILTIN_PRESERVE_BACK_BUFFER,  type_make_void(), 0);
 	reg_builtin(s, "preserve_front_buffer", BUILTIN_PRESERVE_FRONT_BUFFER, type_make_void(), 0);
