@@ -40,6 +40,36 @@ static const BuiltinInfo *builtin_lookup(BuiltinId id) {
 	return NULL;
 }
 
+typedef struct { int id; const char *name; } SyscallNameEntry;
+static const SyscallNameEntry syscall_name_table[] = {
+	{  0, "SYS_PRINT_INT"             },
+	{  1, "SYS_PRINT_FLOAT"           },
+	{  2, "SYS_PRINT_STRING"          },
+	{  3, "SYS_DRAW_RECT"             },
+	{  4, "SYS_DRAW_TEXTURE"          },
+	{  5, "SYS_DRAW_TEXTURE_REGION"   },
+	{  6, "SYS_STORAGE_READ"          },
+	{  7, "SYS_STORAGE_WRITE"         },
+	{  8, "SYS_MEM_COPY"              },
+	{  9, "SYS_MEM_SET"               },
+	{ 10, "SYS_PRESERVE_BACK_BUFFER"  },
+	{ 11, "SYS_PRESERVE_FRONT_BUFFER" },
+	{ 12, "SYS_GET_INPUT"             },
+	{ 13, "SYS_GET_UNIX_TIME"         },
+	{ 14, "SYS_GET_RUNNING_TIME"      },
+	{ 15, "SYS_GET_UPDATE_DELTA"      },
+	{ 16, "SYS_GET_DRAW_DELTA"        },
+	{ 17, "SYS_SET_RNG_SEED"          },
+	{ -1, NULL }
+};
+
+static const char *syscall_name_by_id(int id) {
+	int i;
+	for (i = 0; syscall_name_table[i].name; i++)
+		if (syscall_name_table[i].id == id) return syscall_name_table[i].name;
+	return NULL;
+}
+
 static void asm_type_add(CodeGen *cg, const char *label, const char *misa_type) {
 	if (cg->asm_type_count >= cg->asm_type_cap) {
 		cg->asm_type_cap = cg->asm_type_cap ? cg->asm_type_cap * 2 : 16;
@@ -377,7 +407,7 @@ static int cg_lvalue_addr(CodeGen *cg, AstNode *n, FrameLayout *fl) {
 			int off = fv ? fv->fp_offset : sym->fp_offset;
 			emit(cg, "add %s, fp, %d", rn, off);
 			emit(cg, "mov ea, %s", rn);
-			emit(cg, "lde u32t, %s, 0", rn); 
+			emit(cg, "lde u32t, %s, 0", rn);
 		} else {
 			FrameVar *fv = frame_find(fl, sym->name);
 			int off = fv ? fv->fp_offset : sym->fp_offset;
@@ -517,8 +547,8 @@ static int cg_expr(CodeGen *cg, AstNode *n, FrameLayout *fl) {
 			emit(cg, "tpa %s, %s", rn, fl2);
 			break;
 		}
-		if (sym->type && sym->type->kind == TY_ARRAY) {
-			
+		if (sym->type && (sym->type->kind == TY_ARRAY ||
+		                  (sym->type->kind == TY_POINTER && sym->is_global))) {
 			if (sym->is_global) {
 				emit(cg, "tpa %s, %s", rn, sym->asm_label);
 			} else {
@@ -990,7 +1020,36 @@ static int cg_expr(CodeGen *cg, AstNode *n, FrameLayout *fl) {
 		
 		if (n->u.call.callee->kind == AST_IDENT) {
 			Symbol *sym = symtab_lookup(cg->symtab, n->u.call.callee->u.ident.name);
-			if (sym && sym->builtin_id != BUILTIN_NONE) {
+			if (sym && sym->builtin_id == BUILTIN_SYSCALL) {
+				AstNode *num_node = n->u.call.args ? n->u.call.args->node : NULL;
+				const char *sname = NULL;
+				if (num_node) {
+					long long val = -1;
+					if (num_node->kind == AST_INT_LIT || num_node->kind == AST_CHAR_LIT)
+						val = num_node->u.int_lit.value;
+					else if (num_node->kind == AST_IDENT) {
+						Symbol *cs = symtab_lookup(cg->symtab, num_node->u.ident.name);
+						if (cs && cs->kind == SYM_ENUM_CONST) val = cs->enum_value;
+					}
+					if (val >= 0) sname = syscall_name_by_id((int)val);
+				}
+				if (!sname) {
+					fprintf(stderr, "error: syscall() first argument must be a compile-time SYS_* constant\n");
+					cg->had_error = 1;
+				} else {
+					for (i = 0; i < argc - 1; i++)
+						emit(cg, "mov %s, %s", arg_name(i), arg_name(i + 1));
+					emit(cg, "syscall %s", sname);
+				}
+			} else if (sym && sym->builtin_id == BUILTIN_TO_PA) {
+				emit(cg, "tpr a0");
+			} else if (sym && sym->builtin_id == BUILTIN_YIELD) {
+				emit(cg, "yield");
+			} else if (sym && sym->builtin_id == BUILTIN_EXIT) {
+				emit(cg, "exit");
+			} else if (sym && sym->builtin_id == BUILTIN_BREAK) {
+				emit(cg, "break");
+			} else if (sym && sym->builtin_id != BUILTIN_NONE) {
 				const BuiltinInfo *bi = builtin_lookup(sym->builtin_id);
 				if (bi) {
 					int j;
@@ -1319,6 +1378,56 @@ static void cg_stmt(CodeGen *cg, AstNode *n, FrameLayout *fl) {
 	}
 }
 
+static void cg_register_locals(CodeGen *cg, AstNode *n, FrameLayout *fl) {
+	if (!n) return;
+	if (n->kind == AST_VAR_DECL) {
+		if (!n->u.var.name || n->u.var.is_extern) return;
+		Symbol *sym = symtab_lookup_current(cg->symtab, n->u.var.name);
+		if (!sym)
+			sym = symtab_define(cg->symtab, n->u.var.name,
+			    SYM_VAR, n->u.var.var_type);
+		sym->is_global = 0;
+		FrameVar *fv = frame_find(fl, n->u.var.name);
+		if (fv) sym->fp_offset = fv->fp_offset;
+		return;
+	}
+	if (n->kind == AST_BLOCK) {
+		AstList *it = n->u.block.items;
+		while (it) {
+			cg_register_locals(cg, it->node, fl);
+			it = it->next;
+		}
+		return;
+	}
+	switch (n->kind) {
+	case AST_IF:
+		cg_register_locals(cg, n->u.if_stmt.then_stmt, fl);
+		cg_register_locals(cg, n->u.if_stmt.else_stmt, fl);
+		break;
+	case AST_WHILE: case AST_DO_WHILE:
+		cg_register_locals(cg, n->u.while_stmt.body, fl);
+		break;
+	case AST_FOR:
+		cg_register_locals(cg, n->u.for_stmt.init, fl);
+		cg_register_locals(cg, n->u.for_stmt.body, fl);
+		break;
+	case AST_SWITCH:
+		cg_register_locals(cg, n->u.switch_stmt.body, fl);
+		break;
+	case AST_CASE:
+		cg_register_locals(cg, n->u.case_stmt.stmt, fl);
+		break;
+	case AST_DEFAULT:
+		cg_register_locals(cg, n->u.default_stmt.stmt, fl);
+		break;
+	case AST_LABEL_STMT:
+		cg_register_locals(cg, n->u.label_stmt.stmt, fl);
+		break;
+	default:
+		break;
+	}
+}
+
 static void cg_func(CodeGen *cg, AstNode *n) {
 	if (!n->u.func.name) return;
 
@@ -1364,21 +1473,7 @@ static void cg_func(CodeGen *cg, AstNode *n) {
 	}
 
 	if (n->u.func.body) {
-		AstList *bl = n->u.func.body->u.block.items;
-		while (bl) {
-			if (bl->node && bl->node->kind == AST_VAR_DECL && bl->node->u.var.name) {
-				AstNode *vn = bl->node;
-				Symbol *sym = symtab_lookup_current(cg->symtab, vn->u.var.name);
-				if (!sym) {
-					sym = symtab_define(cg->symtab, vn->u.var.name,
-					    SYM_VAR, vn->u.var.var_type);
-				}
-				sym->is_global = 0;
-				FrameVar *fv = frame_find(&fl, vn->u.var.name);
-				if (fv) sym->fp_offset = fv->fp_offset;
-			}
-			bl = bl->next;
-		}
+		cg_register_locals(cg, n->u.func.body, &fl);
 	}
 
 	fprintf(cg->out, "\n");

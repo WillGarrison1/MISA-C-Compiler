@@ -6,7 +6,7 @@ While I wrote all the code myself, the github workflows and the comments in the 
 
 ## Contributors
 - Nadelio (Creator)
-- [mariusvn (Created CMakeLists.txt)](https://github.com/mariusvn)
+- [mariusvn (Various bug fixes and feature improvements)](https://github.com/mariusvn)
 
 ## Dependencies
 - Clang (for compiling from source)
