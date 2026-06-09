@@ -512,19 +512,19 @@ static AstNode *parse_stmt(Parser *p) {
 
 	if (check(p, TOK_KW_BREAK)) {
 		advance(p);
-		if (check(p, TOK_LPAREN)) { // break() syscall
+		if (check(p, TOK_LPAREN)) { // break() function
 			advance(p);
 			expect(p, TOK_RPAREN);
 			AstNode* breakIdent = ast_new(AST_IDENT, p->cur.line);
 			breakIdent->u.ident.name = strdup("break");
 			
-			AstNode* breakSyscall = ast_new(AST_CALL, p->cur.line);
-			breakSyscall->u.call.callee = breakIdent;
-			breakSyscall->u.call.args = NULL;
-			breakSyscall->u.call.argc = 0;
+			AstNode* breakFunction = ast_new(AST_CALL, p->cur.line);
+			breakFunction->u.call.callee = breakIdent;
+			breakFunction->u.call.args = NULL;
+			breakFunction->u.call.argc = 0;
 
 			AstNode* breakStatement = ast_new(AST_EXPR_STMT, p->cur.line);
-			breakStatement->u.expr_stmt.expr = breakSyscall; 
+			breakStatement->u.expr_stmt.expr = breakFunction; 
 			
 			expect(p, TOK_SEMICOLON);
 			return breakStatement;
